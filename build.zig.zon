@@ -1,9 +1,11 @@
 .{
     .name = "scout",
-    .version = "0.0.0",
+    .version = "0.1.0",
+    .minimum_zig_version = "0.12.0",
+    .dependencies = .{},
     .paths = .{
-        "root.zig",
-        "algorithm.zig",
-        "ahocorasick.zig",
+        "build.zig",
+        "build.zig.zon",
+        "src",
     },
 }
