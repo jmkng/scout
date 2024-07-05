@@ -1,0 +1,9 @@
+.{
+    .name = "scout",
+    .version = "0.0.0",
+    .paths = .{
+        "root.zig",
+        "algorithm.zig",
+        "ahocorasick.zig",
+    },
+}
