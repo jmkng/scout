@@ -38,18 +38,18 @@ pub const Scout = struct {
     ///
     /// The caller owns the returned memory.
     pub fn all(self: Scout, text: []const u8, at: usize) ![]Location {
-        var result = std.ArrayList(Location).init(self.allocator);
-        defer result.deinit();
+        var result = std.ArrayList(Location).empty;
+        defer result.deinit(self.allocator);
 
         var pos: usize = at;
         while (pos < text.len) {
             if (self.next(text, pos)) |location| {
                 if (location.end == pos) pos += 1 else pos = location.end;
-                try result.append(location);
+                try result.append(self.allocator, location);
             } else break;
         }
 
-        return try result.toOwnedSlice();
+        return try result.toOwnedSlice(self.allocator);
     }
 
     /// Return a `Match` if a pattern begins at the provided index.

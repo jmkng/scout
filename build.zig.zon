@@ -1,7 +1,8 @@
 .{
-    .name = "scout",
-    .version = "0.1.0",
-    .minimum_zig_version = "0.12.0",
+    .name = .scout,
+    .fingerprint = 0x176881642d27910b,
+    .version = "0.1.1",
+    .minimum_zig_version = "0.15.1",
     .dependencies = .{},
     .paths = .{
         "build.zig",

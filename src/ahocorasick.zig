@@ -9,6 +9,7 @@ const START = 2;
 
 /// An implementation of `Finder` using the Aho-Corasick algorithm.
 pub const AhoCorasick = struct {
+    allocator: std.mem.Allocator,
     nodes: std.ArrayList(Node),
 
     /// Deinitialize with `deinit`.
@@ -16,13 +17,16 @@ pub const AhoCorasick = struct {
         // TODO: This is where we would select a trainer based on the desired match semantics,
         // but only leftmost-longest is implemented now.
         const trainer = try LeftmostLongestTrainer.init(allocator, patterns);
-        return AhoCorasick{ .nodes = trainer.nodes };
+        return AhoCorasick{
+            .allocator = allocator,
+            .nodes = trainer.nodes,
+        };
     }
 
     /// Release all allocated memory.
     pub fn deinit(self: *AhoCorasick) void {
         for (self.nodes.items) |*node| node.deinit();
-        self.nodes.deinit();
+        self.nodes.deinit(self.allocator);
     }
 
     /// Implementation of `Finder.find` for `AhoCorasick`.
@@ -78,7 +82,7 @@ const LeftmostLongestTrainer = struct {
 
     /// Deinitialize with `deinit`.
     fn init(allocator: std.mem.Allocator, patterns: []const Pattern) !LeftmostLongestTrainer {
-        var trainer = LeftmostLongestTrainer{ .allocator = allocator, .nodes = std.ArrayList(Node).init(allocator) };
+        var trainer = LeftmostLongestTrainer{ .allocator = allocator, .nodes = std.ArrayList(Node).empty };
         try trainer.buildTrie(patterns);
         trainer.encodeStartToStart();
         trainer.encodeDeadToDead();
@@ -117,7 +121,7 @@ const LeftmostLongestTrainer = struct {
             // After iterating through the bytes in the pattern, we end up at the tip of the branch for that pattern.
             // Create a match here to represent that.
             const match = Match{ .id = pattern.id, .len = pattern.value.len };
-            try self.getNode(current_node_id).matches.append(match);
+            try self.getNode(current_node_id).matches.append(self.allocator, match);
         }
     }
 
@@ -125,8 +129,8 @@ const LeftmostLongestTrainer = struct {
     fn encodeTrieFailure(self: *LeftmostLongestTrainer) !void {
         // 0 = transition id
         // 1 = depth of longest match
-        var queue = std.ArrayList(Position).init(self.allocator);
-        defer queue.deinit();
+        var queue = std.ArrayList(Position).empty;
+        defer queue.deinit(self.allocator);
 
         // Populate the queue by performing a breadth-first search of all transitions from `START`.
         for (0..256) |byte| {
@@ -134,7 +138,7 @@ const LeftmostLongestTrainer = struct {
             const transition_id = self.getNode(START).getTransition(as_u8);
             if (transition_id == START) continue; // Avoid infinite loop...
             const match_depth: ?usize = if (self.getNode(START).matches.items.len > 0) 0 else null;
-            try queue.append(Position{ .id = transition_id, .depth_longest_match = match_depth });
+            try queue.append(self.allocator, Position{ .id = transition_id, .depth_longest_match = match_depth });
 
             // * LL
             // Failure should lead to `DEAD` instead of `START`.
@@ -143,8 +147,8 @@ const LeftmostLongestTrainer = struct {
         }
 
         // Traverse queue to find additional transitions.
-        while (queue.items.len > 0) {
-            const popped = queue.pop();
+        while (queue.items.len > 0) { // TODO: Can probably loop over an iterator or something instead?
+            const popped = queue.pop().?;
             const len_after_pop = queue.items.len;
 
             for (0..256) |byte| {
@@ -160,7 +164,7 @@ const LeftmostLongestTrainer = struct {
                 } else if (transition_node.matches.items.len > 0) {
                     next_match_depth = transition_node.depth - transition_node.getLongestMatch().? + 1;
                 }
-                try queue.append(Position{ .id = leads_to_id, .depth_longest_match = next_match_depth });
+                try queue.append(self.allocator, Position{ .id = leads_to_id, .depth_longest_match = next_match_depth });
 
                 // Figure out what this falls back to.
                 const popped_fail_id = self.getNode(popped.id).fail;
@@ -197,7 +201,7 @@ const LeftmostLongestTrainer = struct {
                 }
                 std.debug.assert(fail_node != null and leads_to_node != null);
                 // Clone the fail_node matches over to leads_to_node matches.
-                try leads_to_node.?.matches.appendSlice(fail_node.?.matches.items);
+                try leads_to_node.?.matches.appendSlice(self.allocator, fail_node.?.matches.items);
             }
 
             // If this is a match state with no transitions, set FAIL to DEAD to prevent it from restarting.
@@ -241,7 +245,7 @@ const LeftmostLongestTrainer = struct {
     fn addNode(self: *LeftmostLongestTrainer, depth: usize) !usize {
         const id = self.nodes.items.len;
         const node = Node.init(self.allocator, START, depth);
-        try self.nodes.append(node);
+        try self.nodes.append(self.allocator, node);
         return id;
     }
 
@@ -252,6 +256,7 @@ const LeftmostLongestTrainer = struct {
 };
 
 const Node = struct {
+    allocator: std.mem.Allocator,
     /// The patterns matched by this `Node`.
     matches: std.ArrayList(Match),
     /// Transitions to other `Node`.
@@ -264,7 +269,8 @@ const Node = struct {
     /// Deinitialize with `deinit`.
     fn init(allocator: std.mem.Allocator, fail: usize, depth: usize) Node {
         return Node{
-            .matches = std.ArrayList(Match).init(allocator),
+            .allocator = allocator,
+            .matches = std.ArrayList(Match).empty,
             .fail = fail,
             .depth = depth,
         };
@@ -272,7 +278,7 @@ const Node = struct {
 
     /// Release all allocated memory.
     fn deinit(self: *Node) void {
-        self.matches.deinit();
+        self.matches.deinit(self.allocator);
     }
 
     /// Get a `Node` transition ID for a byte.
