@@ -1,4 +1,7 @@
-Scout can quickly and efficiently search for patterns in large amounts of text.
+Scout can quickly and efficiently search for patterns in text.
+
+The library is designed to work with a variety of algorithms,
+but currently provides a single implementation: AhoCorasick with leftmost-longest semantics.
 
 # Installation
 
@@ -6,7 +9,7 @@ Scout can quickly and efficiently search for patterns in large amounts of text.
 zig fetch --save git+https://github.com/jmkng/scout
 ```
 
-In `build.zig`:
+In build.zig:
 
 ```zig
 const scout = b.dependency("scout", .{});
@@ -23,7 +26,8 @@ const Pattern = @import("scout").Pattern;
 
 const patterns = [_]Pattern{
     Pattern{ .id = 0, .value = ">>" },
-}
+    Pattern{ .id = 1, .value = "##" },
+};
 ```
 
 Give the patterns to Scout.init to train an automaton.
@@ -31,34 +35,8 @@ Give the patterns to Scout.init to train an automaton.
 ```zig
 const Scout = @import("scout").Scout;
 
-var s = Scout.init(allocator,  .{ .patterns = &patterns });
-defer s.deinit();
+var scout = try Scout.init(allocator, patterns[0..patterns.len], Algorithm.ahocorasick_ll);
+defer scout.deinit();
 ```
 
-Use Scout.next to return the location of the next pattern from a starting index,
-or null if none are found.
-
-```zig
-const haystack = "hello >> world";
-var maybe_location = s.next(haystack, 0);
-```
-
-Alternatively, use Scout.all to return a slice of all the discovered patterns from a starting index.
-It will be empty if none are found.
-
-The caller owns the returned memory.
-
-```zig
-const haystack = "hello >> world";
-var locations = s.all(haystack, 0);
-defer allocator.free(locations);
-```
-
-The Scout.starts method returns a match if the index is the beginning of a pattern,
-or null otherwise.
-
-```zig
-const haystack = "hello >> world";
-var maybe_match = s.starts(haystack, 0); // Null
-maybe_match = s.starts(haystack, 6); // Match 
-```
+Use the methods on scout to search. See the tests at the bottom of root.zig for examples.
