@@ -2,7 +2,7 @@ const std = @import("std");
 const mem = std.mem;
 const Allocator = mem.Allocator;
 
-const AhoCorasick = @import("./ahocorasick.zig").AhoCorasick;
+const LeftmostLongest = @import("./ahocorasick.zig").LeftmostLongest;
 
 /// Flags for supported algorithms.
 pub const Algorithm = enum {
@@ -15,10 +15,10 @@ pub const Scout = struct {
 
     /// Deinitialize with deinit.
     pub fn init(alloc: Allocator, patterns: []const Pattern, algo: Algorithm) !Scout {
-        return .{ 
+        return .{
             .backend = switch(algo) {
-                .ahocorasick_ll => .{ 
-                    .ahocorasick = try AhoCorasick.init(alloc, patterns) 
+                .ahocorasick_ll => .{
+                    .ahocorasick = try LeftmostLongest.init(alloc, patterns)
                 },
             }
         };
@@ -63,7 +63,7 @@ pub const Scout = struct {
     /// Storage for the selected algorithm.
     /// A method find is exposed, which calls the underlying find method on the backend.
     const Backend = union(enum) {
-        ahocorasick: AhoCorasick,
+        ahocorasick: LeftmostLongest,
 
         /// Release all allocated memory.
         fn deinit(self: *Backend, alloc: Allocator) void {
