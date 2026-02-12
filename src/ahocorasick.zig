@@ -88,6 +88,9 @@ const LeftmostLongest = struct {
     fn init(alloc: Allocator, patterns: []const Pattern) !LeftmostLongest {
         var trainer = LeftmostLongest{ .nodes = std.ArrayList(Node).empty };
         try trainer.buildTrie(alloc, patterns);
+        errdefer {
+            trainer.deinit(alloc);
+        }
         trainer.encodeStartToStart();
         trainer.encodeDeadToDead();
         try trainer.encodeTrieFailure(alloc);
