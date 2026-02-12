@@ -17,8 +17,8 @@ const START = 2;
 
 /// Aho-Corasick with leftmost-longest match semantics.
 pub const LeftmostLongest = struct {
-    // Nodes assembled during LeftmostLongest.buildTrie.
-    // Each node describes a set of transitions to other nodes for each possible byte value.
+    /// Nodes assembled during LeftmostLongest.buildTrie.
+    /// Each node describes a set of transitions to other nodes for each possible byte value.
     nodes: std.ArrayList(Node),
 
     /// Deinitialize with deinit.
