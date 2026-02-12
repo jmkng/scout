@@ -123,13 +123,51 @@ pub const Match = struct {
 
 const testing = std.testing;
 
-test "lifecycle" {
-    // These are the patterns that the algorithm will recognize.
-    // When a match is found in some text, a Match is returned which contains the pattern id you provided for that pattern.
+test "find" {
+    var scout = try testMakeScout1();
+    defer scout.deinit(testing.allocator);
+
+    const haystack = ">> blah blah";
+    const maybe_location1 = scout.find(haystack, 2);
+    try testing.expectEqual(null, maybe_location1);
+
+    const maybe_location2 = scout.find(haystack, 0) orelse {
+        return error.TestUnexpectedError;
+    };
+    try testing.expectEqualDeep(Location{
+        .match = .{ .id = 0, .len = 2 },
+        .end = 2,
+    }, maybe_location2);
+}
+
+test "all" {
+    var scout = try testMakeScout1();
+    defer scout.deinit(testing.allocator);
+
+    const haystack = ">> blah >> blah";
+    const locations = try scout.all(testing.allocator, haystack, 10);
+    defer testing.allocator.free(locations);
+    try testing.expectEqual(locations.len, 0);
+
+    const locations2 = try scout.all(testing.allocator, haystack, 0);
+    defer testing.allocator.free(locations2);
+    try testing.expectEqual(locations2.len, 2);
+}
+
+test "starts" {
+    var scout = try testMakeScout1();
+    defer scout.deinit(testing.allocator);
+
+    const haystack = ">> blah blah";
+    try testing.expectEqual(scout.starts(haystack, 5), null);
+    try testing.expectEqual(scout.starts(haystack, 0), Match{ .id = 0, .len = 2 });
+}
+
+fn testMakeScout1() !Scout {
     const patterns = [_]Pattern{
         Pattern{ .id = 0, .value = ">>" },
-        Pattern{ .id = 1, .value = "##" },
     };
-    var scout = try Scout.init(testing.allocator, patterns[0..patterns.len], Algorithm.ahocorasick_ll);
-    defer scout.deinit(testing.allocator);
+
+    const scout = try Scout.init(testing.allocator, patterns[0..patterns.len], Algorithm.ahocorasick_ll);
+    return scout;
 }
