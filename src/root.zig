@@ -152,6 +152,11 @@ test "all" {
     const locations2 = try scout.all(testing.allocator, haystack, 0);
     defer testing.allocator.free(locations2);
     try testing.expectEqual(locations2.len, 2);
+    const expected: [2]Location = .{
+        Location{ .match = Match{ .id = 0, .len = 2 }, .end = 2 },
+        Location{ .match = Match{ .id = 0, .len = 2 }, .end = 10 }
+    };
+    try testing.expectEqualDeep(&expected, locations2);
 }
 
 test "starts" {
