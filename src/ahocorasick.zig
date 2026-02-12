@@ -11,19 +11,34 @@ const FAIL = 0;
 const DEAD = 1;
 const START = 2;
 
-pub const AhoCorasick = struct {
+// NOTE: Code marked with the following symbol is specific to leftmost-longest match semantics:
+//
+//      *LL
+
+/// Aho-Corasick with leftmost-longest match semantics.
+pub const LeftmostLongest = struct {
+    // Nodes assembled during LeftmostLongest.buildTrie.
+    // Each node describes a set of transitions to other nodes for each possible byte value.
     nodes: std.ArrayList(Node),
 
     /// Deinitialize with deinit.
-    pub fn init(alloc: Allocator, patterns: []const Pattern) !AhoCorasick {
-        const impl = try LeftmostLongest.init(alloc, patterns);
-        return AhoCorasick{
-            .nodes = impl.nodes,
-        };
+    pub fn init(alloc: Allocator, patterns: []const Pattern) !LeftmostLongest {
+        var ll = LeftmostLongest{ .nodes = std.ArrayList(Node).empty };
+        try ll.buildTrie(alloc, patterns);
+        errdefer {
+            ll.deinit(alloc);
+        }
+        ll.encodeStartToStart();
+        ll.encodeDeadToDead();
+        try ll.encodeTrieFailure(alloc);
+        if (ll.getNode(START).matches.items.len > 0) {
+            ll.encodeStartToDead();
+        }
+        return ll;
     }
 
     /// Release all allocated memory.
-    pub fn deinit(self: *AhoCorasick, alloc: Allocator) void {
+    pub fn deinit(self: *LeftmostLongest, alloc: Allocator) void {
         for (self.nodes.items) |*node| {
             node.deinit(alloc);
         }
@@ -31,7 +46,7 @@ pub const AhoCorasick = struct {
     }
 
     /// Return the next Location in text from index at.
-    pub fn find(self: AhoCorasick, text: []const u8, at: usize) ?Location {
+    pub fn find(self: @This(), text: []const u8, at: usize) ?Location {
         var index_in_bytes = at;
         var current_state: usize = START;
         var last_location = self.getLocation(START, 0, index_in_bytes);
@@ -52,63 +67,32 @@ pub const AhoCorasick = struct {
         return last_location;
     }
 
-    fn getLocation(self: AhoCorasick, id: usize, match: usize, end: usize) ?Location {
-        const state = self.getNodeUnchecked(id);
-        if (state.matches.items.len == 0 or match >= state.matches.items.len) return null;
+    /// Return a Location for a node and match id with the given end index.
+    fn getLocation(self: @This(), id: usize, match: usize, end: usize) ?Location {
+        // Index into nodes by id.
+        const node = self.getNodeUnchecked(id);
+        if (node.matches.items.len == 0 or match >= node.matches.items.len) return null;
 
-        const match_node = state.matches.items[match];
+        const match_node = node.matches.items[match];
         return Location{ .match = match_node, .end = end };
     }
 
     /// Returns a *Node by id.
     /// Does not perform bounds check.
-    fn getNodeUnchecked(self: AhoCorasick, id: usize) *Node {
+    fn getNodeUnchecked(self: @This(), id: usize) *Node {
         return &self.nodes.items[id];
     }
 
-    /// Return the next non-fail `Node`.
-    fn nextNonFailNode(self: AhoCorasick, id: usize, byte: u8) usize {
+    /// Return the next non-fail Node id.
+    fn nextNonFailNode(self: @This(), id: usize, byte: u8) usize {
         var current_id = id;
         while (true) {
             const next = self.getNodeUnchecked(current_id).getTransition(byte);
             if (next != FAIL) return next else current_id = self.getNodeUnchecked(current_id).fail;
         }
     }
-};
 
-// NOTE: Code marked with the following symbol is specific to leftmost-longest match semantics:
-//
-//      *LL
-
-/// Automaton with leftmost-longest match semantics.
-const LeftmostLongest = struct {
-    nodes: std.ArrayList(Node),
-
-    /// Deinitialize with deinit.
-    fn init(alloc: Allocator, patterns: []const Pattern) !LeftmostLongest {
-        var trainer = LeftmostLongest{ .nodes = std.ArrayList(Node).empty };
-        try trainer.buildTrie(alloc, patterns);
-        errdefer {
-            trainer.deinit(alloc);
-        }
-        trainer.encodeStartToStart();
-        trainer.encodeDeadToDead();
-        try trainer.encodeTrieFailure(alloc);
-        if (trainer.getNode(START).matches.items.len > 0) {
-            trainer.encodeStartToDead();
-        }
-        return trainer;
-    }
-
-    /// Release all allocated memory.
-    fn deinit(self: *LeftmostLongest, alloc: Allocator) void {
-        for (self.nodes.items) |*node| {
-            node.deinit(alloc);
-        }
-        self.nodes.deinit(alloc);
-    }
-
-    /// Build a trie with a node for each byte in patterns.
+    /// Build a trie with a Node for each byte in patterns.
     fn buildTrie(self: *LeftmostLongest, alloc: Allocator, patterns: []const Pattern) !void {
         // Create three nodes for the base (fail, start, dead) states.
         for (0..3) |_| {
