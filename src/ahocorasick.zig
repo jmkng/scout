@@ -38,7 +38,7 @@ pub const LeftmostLongest = struct {
     }
 
     /// Release all allocated memory.
-    pub fn deinit(self: *LeftmostLongest, alloc: Allocator) void {
+    pub fn deinit(self: *@This(), alloc: Allocator) void {
         for (self.nodes.items) |*node| {
             node.deinit(alloc);
         }
@@ -93,7 +93,7 @@ pub const LeftmostLongest = struct {
     }
 
     /// Build a trie with a Node for each byte in patterns.
-    fn buildTrie(self: *LeftmostLongest, alloc: Allocator, patterns: []const Pattern) !void {
+    fn buildTrie(self: *@This(), alloc: Allocator, patterns: []const Pattern) !void {
         // Create three nodes for the base (fail, start, dead) states.
         for (0..3) |_| {
             _ = try self.addNode(alloc, 0);
@@ -126,7 +126,7 @@ pub const LeftmostLongest = struct {
     }
 
     /// Encode a FAIL state transition for each Node.
-    fn encodeTrieFailure(self: *LeftmostLongest, alloc: Allocator) !void {
+    fn encodeTrieFailure(self: *@This(), alloc: Allocator) !void {
         // 0 = transition id
         // 1 = depth of longest match
         var queue = std.ArrayList(Position).empty;
