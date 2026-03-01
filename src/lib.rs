@@ -3,13 +3,14 @@
 pub mod ahocorasick;
 
 /// Matched pattern.
-#[derive(Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Match {
     pub pattern_id: usize,
     pub pattern_len: usize,
 }
 
 /// Location of a match within some source text.
+#[derive(Debug, PartialEq)]
 pub struct Location {
     pub r#match: Match,
     /// Index of the first non-pattern byte that is discovered after a match.
