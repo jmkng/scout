@@ -283,6 +283,49 @@ impl LeftmostLongest {
 mod tests {
     use super::*;
 
-    // TODO
+    #[test]
+    fn ahocorasick_basics() {
+        let haystack = b"abc def ghi jkl mno pqr abc";
+        let patterns = [
+            Pattern { id: 0, value: b"bc" },
+            Pattern { id: 1, value: b"ghi" },
+            Pattern { id: 2, value: b"o p" },
+            Pattern { id: 3, value: b"qr" },
+        ];
+        let expected = [
+            Location { r#match: Match { pattern_id: 0, pattern_len: 2 }, end: 3 },
+            Location { r#match: Match { pattern_id: 1, pattern_len: 3 }, end: 11 },
+            Location { r#match: Match { pattern_id: 2, pattern_len: 3 }, end: 21 },
+            Location { r#match: Match { pattern_id: 3, pattern_len: 2 }, end: 23 },
+            Location { r#match: Match { pattern_id: 0, pattern_len: 2 }, end: 27 },
+        ];
+        t(&patterns, haystack, &expected);
+    }
 
+    #[track_caller]
+    fn t(patterns: &[Pattern], haystack: &[u8], expected: &[Location]) {
+        let mut ll = LeftmostLongest::new(patterns);
+        let locations = all(&mut ll, haystack, 0);
+        assert_eq!(expected.len(), locations.len());
+        for (index, expected) in expected.iter().enumerate() {
+            assert_eq!(expected, &locations[index]);
+        }
+    }
+
+    fn all(ll: &mut LeftmostLongest, haystack: &[u8], mut at: usize) -> Vec<Location> {
+        let mut locations: Vec<Location> = Vec::new();
+        while at < haystack.len() {
+            if let Some(loc) = ll.find(haystack, at) {
+                if loc.end == at {
+                    at += 1;
+                } else {
+                    at = loc.end;
+                }
+                locations.push(loc);
+            } else {
+                break;
+            }
+        }
+        locations
+    }
 }
