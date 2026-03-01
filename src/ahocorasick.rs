@@ -4,6 +4,7 @@ use std::collections::{
 
 use crate::{
     Match,
+    Location,
     Pattern,
 };
 
@@ -55,6 +56,8 @@ pub struct LeftmostLongest {
 }
 
 impl LeftmostLongest {
+    /// Return a new AhoCorasick automaton with leftmost-longest
+    /// match semantics.
     pub fn new(patterns: &[Pattern]) -> Self {
         let mut ll = Self { nodes: Vec::new() };
         ll.build_trie(patterns);
@@ -66,6 +69,52 @@ impl LeftmostLongest {
         }
         ll
     }
+
+    /// Return the [`Location`] of the next [`Match`] in the haystack from start_byte_index.
+    pub fn find(&self, haystack: &[u8], mut start_byte_index: usize) -> Option<Location> {
+        let mut last_location = self.get_location(START, 0, start_byte_index);
+        let mut current_node_id: usize = START;
+        while start_byte_index < haystack.len() {
+            current_node_id = self.get_next_non_fail_node_id(current_node_id, haystack[start_byte_index]);
+            debug_assert_ne!(current_node_id, FAIL);
+            start_byte_index += 1;
+            if current_node_id == DEAD {
+                debug_assert_ne!(last_location, None);
+                return last_location;
+            }
+            let location = self.get_location(current_node_id, 0, start_byte_index);
+            if location.is_some() {
+                last_location = location;
+            }
+        }
+        last_location
+    }
+
+    /// Return a [`Location`] for a node id and match id with end index.
+    fn get_location(&self, id: usize, r#match: usize, end: usize) -> Option<Location> {
+        let node = &self.nodes[id];
+        if node.matches.len() == 0 || r#match >= node.matches.len() {
+            return None;
+        }
+        let match_node = node.matches[r#match];
+        Some(Location{ r#match: match_node, end })
+    }
+
+    /// Return the next non-fail node id.
+    fn get_next_non_fail_node_id(&self, mut id: usize, byte: u8) -> usize {
+        loop {
+            let next = self.nodes[id].transitions[byte as usize];
+            if next != FAIL {
+                return next
+            } else {
+                id = self.nodes[id].fail;
+            }
+        }
+    }
+
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    // Trie
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
     /// Build a trie with a node for each byte in patterns.
     fn build_trie(&mut self, patterns: &[Pattern]) {
