@@ -285,21 +285,125 @@ mod tests {
 
     #[test]
     fn ahocorasick_basics() {
-        let haystack = b"abc def ghi jkl mno pqr abc";
+        {
+            let haystack = b"abc def ghi jkl mno pqr abc";
+            let patterns = [
+                Pattern { id: 0, value: b"bc" },
+                Pattern { id: 1, value: b"ghi" },
+                Pattern { id: 2, value: b"o p" },
+                Pattern { id: 3, value: b"qr" },
+            ];
+            let expected = [
+                Location { r#match: Match { pattern_id: 0, pattern_len: 2 }, end: 3 },
+                Location { r#match: Match { pattern_id: 1, pattern_len: 3 }, end: 11 },
+                Location { r#match: Match { pattern_id: 2, pattern_len: 3 }, end: 21 },
+                Location { r#match: Match { pattern_id: 3, pattern_len: 2 }, end: 23 },
+                Location { r#match: Match { pattern_id: 0, pattern_len: 2 }, end: 27 },
+            ];
+            t(&patterns, haystack, &expected);
+        }
+        {
+            let haystack = b"a";
+            let patterns = [
+                Pattern{ id: 0, value: b"a" },
+            ];
+            let expected = [
+                Location { r#match: Match { pattern_id: 0, pattern_len: 1 }, end: 1 },
+            ];
+            t(&patterns, haystack, &expected);
+        }
+        {
+            let haystack = b"aa";
+            let patterns = [
+                Pattern{ id: 0, value: b"a" },
+            ];
+            let expected = [
+                Location { r#match: Match { pattern_id: 0, pattern_len: 1 }, end: 1 },
+                Location { r#match: Match { pattern_id: 0, pattern_len: 1 }, end: 2 },
+            ];
+            t(&patterns, haystack, &expected);
+        }
+    }
+
+    #[test]
+    fn ahocorasick_non_overlapping() {
+        let haystack = b"qwerty";
         let patterns = [
-            Pattern { id: 0, value: b"bc" },
-            Pattern { id: 1, value: b"ghi" },
-            Pattern { id: 2, value: b"o p" },
-            Pattern { id: 3, value: b"qr" },
+            Pattern{ id: 0, value: b"qwerty" },
+            Pattern{ id: 1, value: b"werty" },
+            Pattern{ id: 2, value: b"erty" },
         ];
         let expected = [
-            Location { r#match: Match { pattern_id: 0, pattern_len: 2 }, end: 3 },
-            Location { r#match: Match { pattern_id: 1, pattern_len: 3 }, end: 11 },
-            Location { r#match: Match { pattern_id: 2, pattern_len: 3 }, end: 21 },
-            Location { r#match: Match { pattern_id: 3, pattern_len: 2 }, end: 23 },
-            Location { r#match: Match { pattern_id: 0, pattern_len: 2 }, end: 27 },
+            Location { r#match: Match { pattern_id: 0, pattern_len: 6 }, end: 6 },
         ];
         t(&patterns, haystack, &expected);
+    }
+
+    #[test]
+    fn ahocorasick_leftmost() {
+        {
+            let haystack = b"abcd";
+            let patterns = [
+                Pattern{ id: 0, value: b"ab" },
+                Pattern{ id: 1, value: b"ab" },
+            ];
+            let expected = [
+                Location { r#match: Match { pattern_id: 0, pattern_len: 2 }, end: 2 },
+            ];
+            t(&patterns, haystack, &expected);
+        }
+        {
+            let haystack = b"abce";
+            let patterns = [
+                Pattern{ id: 0, value: b"abcd" },
+                Pattern{ id: 1, value: b"bce" },
+                Pattern{ id: 2, value: b"b" },
+            ];
+            let expected = [
+                Location { r#match: Match { pattern_id: 1, pattern_len: 3 }, end: 4 },
+            ];
+            t(&patterns, haystack, &expected);
+        }
+    }
+    
+    #[test]
+    fn ahocorasick_leftmost_longest() {
+        {
+            let haystack = b"abcd";
+            let patterns = [
+                Pattern{ id: 0, value: b"ab" },
+                Pattern{ id: 1, value: b"abcd" },
+            ];
+            let expected = [
+                Location { r#match: Match { pattern_id: 1, pattern_len: 4 }, end: 4 },
+            ];
+            t(&patterns, haystack, &expected);
+        }
+        {
+            let haystack = b"abcdefghz";
+            let patterns = [
+                Pattern{ id: 0, value: b"a" },
+                Pattern{ id: 1, value: b"abcdef" },
+                Pattern{ id: 2, value: b"abc" },
+                Pattern{ id: 3, value: b"abcdefg" },
+            ];
+            let expected = [
+                Location { r#match: Match { pattern_id: 3, pattern_len: 7 }, end: 7 },
+            ];
+            t(&patterns, haystack, &expected);
+        }
+        {
+            let haystack = b"azcabbbc";
+            let patterns = [
+                Pattern{ id: 0, value: b"a" },
+                Pattern{ id: 1, value: b"ab" },
+            ];
+            let expected = [
+                Location { r#match: Match { pattern_id: 0, pattern_len: 1 }, end: 1 },
+                Location { r#match: Match { pattern_id: 1, pattern_len: 2 }, end: 5 },
+            ];
+            t(&patterns, haystack, &expected);
+        }
     }
 
     #[track_caller]
